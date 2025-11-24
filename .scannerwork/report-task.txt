@@ -1,0 +1,6 @@
+projectKey=shraddha
+serverUrl=http://localhost:9000
+serverVersion=25.9.0.112764
+dashboardUrl=http://localhost:9000/dashboard?id=shraddha
+ceTaskId=55cc5ac2-130b-4fe3-a4b2-88f2f3a64c38
+ceTaskUrl=http://localhost:9000/api/ce/task?id=55cc5ac2-130b-4fe3-a4b2-88f2f3a64c38

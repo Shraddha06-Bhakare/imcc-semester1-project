@@ -1,0 +1,67 @@
+/* Style the carousel container to control the slider size */
+.carousel {
+      width: 100%; /* Make the slider responsive */
+      max-width: 1920px; /* Limit maximum width */
+      height: auto; /* Adjust height based on content */
+      margin: 0 auto; /* Center the slider horizontally */
+      overflow: hidden; /* Ensure no overflow outside the slider container */
+    }
+    
+    /* Style the inner carousel to make all items the same size */
+    .carousel-inner {
+      width: 100%;
+      height: auto;
+    }
+    
+    /* Style individual carousel items */
+    .carousel-item img {
+      width: 1920px; /* Set specific width */
+      height: 816px; /* Set specific height */
+      object-fit: cover; /* Ensure the image fills the space without distortion */
+    }
+    
+.goodnessseccont img{
+      width:100%;
+}
+
+.buttermilk{
+      background-color:#fff;
+      background-image:linear-gradient(#fff7ef,#fff);
+      background-image:-webkit-linear-gradient(#fff7ef,#fff);
+      background-image:-moz-linear-gradient(#fff7ef,#fff);
+      background-image:-ms-linear-gradient(#fff7ef,#fff);
+      background-image:-o-linear-gradient(#fff7ef,#fff);
+      padding:50px 40px;
+      border:1px solid #efe8e1;
+      padding-bottom:20px;
+}
+.smbg{
+      background-color:#fff;
+      background-image:linear-gradient(rgba(110, 69, 143, 0.1),#fff);
+      background-image:-webkit-linear-gradient(rgba(110, 69, 143, 0.1),#fff);
+      background-image:-moz-linear-gradient(rgba(110, 69, 143, 0.1),#fff);
+      background-image:-ms-linear-gradient(rgba(110, 69, 143, 0.1),#fff);
+      background-image:-o-linear-gradient(rgba(110, 69, 143, 0.1),#fff);
+}
+.curdbgpro{
+      background-color:#fff;
+      background-image:linear-gradient(rgba(10, 77, 123, 0.1),#fff);
+      background-image:-webkit-linear-gradient(rgba(10, 77, 123, 0.1),#fff);
+      background-image:-moz-linear-gradient(rgba(10, 77, 123, 0.1),#fff);
+      background-image:-ms-linear-gradient(rgba(10, 77, 123, 0.1),#fff);
+      background-image:-o-linear-gradient(rgba(10, 77, 123, 0.1),#fff);
+}
+
+.mlkpro{
+      color:#636362;
+      font-size:22px;
+      line-height:22px;
+      margin-bottom:15px;
+      width:43%
+      margin:0 auto;
+      text-align:center;
+}
+.goodnesssec a{
+      text-decoration: none;
+}
+

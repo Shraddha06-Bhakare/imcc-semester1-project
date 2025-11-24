@@ -1,0 +1,89 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Feedback</title>
+    <!-- Include Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 900px;
+            margin-top: 50px;
+        }
+        .heading {
+            text-align: center;
+            font-size: 30px;
+            color: #007bff;
+            margin-bottom: 30px;
+        }
+        .feedback-card {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        .feedback-message {
+            font-size: 16px;
+            color: #333;
+        }
+        .feedback-meta {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .btn-custom {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        .btn-custom:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="heading text-black">All Feedback</h1>
+
+    <!-- Feedback List -->
+    <div class="row">
+        {% for feedback in feedback_list %}
+            <div class="col-md-12">
+                <div class="feedback-card">
+                    <strong>{{ feedback.name }}</strong> (<em>{{ feedback.email }}</em>)
+                    <p class="feedback-message">{{ feedback.message }}</p>
+                    {% comment %} <small class="feedback-meta">Submitted on: {{ feedback.created_at }}</small> {% endcomment %}
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-md-12">
+                <div class="feedback-card">
+                    <p>No feedback available yet.</p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Back button to return to the feedback form page -->
+    <div class="text-center mt-4">
+        <a href="{% url 'feedback_form' %}">
+            <button class="btn btn-primary">Back to Feedback Form</button>
+        </a>
+    </div>
+</div>
+
+<!-- Bootstrap JS (optional, for features like modals, etc.) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,46 @@
+cat > .gitignore <<'EOF'
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*.so
+*.log
+
+# Virtual environments
+venv/
+.env
+.venv/
+env/
+ENV/
+
+# Database
+db.sqlite3
+*.sqlite3
+
+# Django static & media
+/static/
+/media/
+staticfiles/
+
+# IDE/editor
+.vscode/
+.idea/
+*.suo
+*.swp
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+# Node
+node_modules/
+
+# Secrets
+*.pem
+*.key
+
+# pipenv / poetry
+Pipfile.lock
+poetry.lock
+EOF
