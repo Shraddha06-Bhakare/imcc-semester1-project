@@ -1183,6 +1183,133 @@
 
 
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         REGISTRY = "localhost:8082"
+//         IMAGE_NAME = "ecommerce-web"
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//     }
+
+//     stages {
+//         stage('Checkout Code') {
+//             steps {
+//                 deleteDir()
+//                 git branch: 'main',
+//                     credentialsId: "${GIT_CREDENTIAL}",
+//                     url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project.git'
+//             }
+//         }
+
+//         stage('Install Tools') {
+//             steps {
+//                 sh '''
+//                 echo "=== Installing Required Tools ==="
+//                 # Install necessary packages
+//                 apk add --no-cache curl wget unzip
+                
+//                 # Install kubectl
+//                 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+//                 chmod +x kubectl
+//                 mkdir -p $HOME/bin
+//                 mv kubectl $HOME/bin/
+//                 export PATH=$HOME/bin:$PATH
+//                 '''
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 withSonarQubeEnv("${SONAR_SERVER}") {
+//                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
+//                         sh '''
+//                         echo "=== Setting up Sonar Scanner ==="
+//                         # Download and setup sonar-scanner
+//                         wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
+//                         unzip -q sonar-scanner-cli-4.8.0.2856-linux.zip
+                        
+//                         echo "=== Running SonarQube Analysis ==="
+//                         ./sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner \
+//                         -Dsonar.projectKey=ecommerce_django_project \
+//                         -Dsonar.sources=. \
+//                         -Dsonar.host.url=http://sonarqube.imcc.com \
+//                         -Dsonar.login=${SONAR_TOKEN}
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Build and Push Docker Image') {
+//             steps {
+//                 script {
+//                     echo "=== Building Docker Image ==="
+                    
+//                     // Check if we can access docker
+//                     sh '''
+//                     which docker || echo "Docker not in PATH"
+//                     docker --version || echo "Cannot run docker commands"
+//                     '''
+                    
+//                     // Build the image
+//                     sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
+                    
+//                     // Push the image
+//                     withCredentials([usernamePassword(
+//                         credentialsId: "${DOCKER_CREDENTIAL}",
+//                         usernameVariable: 'USERNAME',
+//                         passwordVariable: 'PASSWORD'
+//                     )]) {
+//                         sh """
+//                         docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
+//                         docker push ${REGISTRY}/${IMAGE_NAME}:latest
+//                         """
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Kubernetes Deployment') {
+//             steps {
+//                 sh '''
+//                 echo "=== Kubernetes Deployment ==="
+//                 export PATH=$HOME/bin:$PATH
+                
+//                 # Check if we have kubeconfig
+//                 kubectl cluster-info || echo "No kubeconfig configured"
+                
+//                 # Try to apply manifests
+//                 if [ -f "K8s/deployment.yaml" ]; then
+//                     kubectl apply -f K8s/deployment.yaml --validate=false
+//                 else
+//                     echo "deployment.yaml not found in K8s directory"
+//                 fi
+                
+//                 if [ -f "K8s/service.yaml" ]; then
+//                     kubectl apply -f K8s/service.yaml --validate=false
+//                 else
+//                     echo "service.yaml not found in K8s directory"
+//                 fi
+//                 '''
+//             }
+//         }
+//     }
+
+//     post {
+//         success {
+//             echo "🚀 Pipeline executed successfully!"
+//         }
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//     }
+// }
+
+
+
 pipeline {
     agent any
 
@@ -1204,19 +1331,11 @@ pipeline {
             }
         }
 
-        stage('Install Tools') {
+        stage('Install Basic Tools') {
             steps {
                 sh '''
-                echo "=== Installing Required Tools ==="
-                # Install necessary packages
+                echo "=== Installing Basic Tools ==="
                 apk add --no-cache curl wget unzip
-                
-                # Install kubectl
-                curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                chmod +x kubectl
-                mkdir -p $HOME/bin
-                mv kubectl $HOME/bin/
-                export PATH=$HOME/bin:$PATH
                 '''
             }
         }
@@ -1226,12 +1345,9 @@ pipeline {
                 withSonarQubeEnv("${SONAR_SERVER}") {
                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                        echo "=== Setting up Sonar Scanner ==="
-                        # Download and setup sonar-scanner
+                        echo "=== Running SonarQube Analysis ==="
                         wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
                         unzip -q sonar-scanner-cli-4.8.0.2856-linux.zip
-                        
-                        echo "=== Running SonarQube Analysis ==="
                         ./sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner \
                         -Dsonar.projectKey=ecommerce_django_project \
                         -Dsonar.sources=. \
@@ -1243,57 +1359,24 @@ pipeline {
             }
         }
 
-        stage('Build and Push Docker Image') {
+        stage('Build Docker Image') {
             steps {
-                script {
-                    echo "=== Building Docker Image ==="
-                    
-                    // Check if we can access docker
-                    sh '''
-                    which docker || echo "Docker not in PATH"
-                    docker --version || echo "Cannot run docker commands"
-                    '''
-                    
-                    // Build the image
-                    sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
-                    
-                    // Push the image
-                    withCredentials([usernamePassword(
-                        credentialsId: "${DOCKER_CREDENTIAL}",
-                        usernameVariable: 'USERNAME',
-                        passwordVariable: 'PASSWORD'
-                    )]) {
-                        sh """
-                        docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
-                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
-                        """
-                    }
-                }
+                sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
             }
         }
 
-        stage('Kubernetes Deployment') {
+        stage('Push Docker Image') {
             steps {
-                sh '''
-                echo "=== Kubernetes Deployment ==="
-                export PATH=$HOME/bin:$PATH
-                
-                # Check if we have kubeconfig
-                kubectl cluster-info || echo "No kubeconfig configured"
-                
-                # Try to apply manifests
-                if [ -f "K8s/deployment.yaml" ]; then
-                    kubectl apply -f K8s/deployment.yaml --validate=false
-                else
-                    echo "deployment.yaml not found in K8s directory"
-                fi
-                
-                if [ -f "K8s/service.yaml" ]; then
-                    kubectl apply -f K8s/service.yaml --validate=false
-                else
-                    echo "service.yaml not found in K8s directory"
-                fi
-                '''
+                withCredentials([usernamePassword(
+                    credentialsId: "${DOCKER_CREDENTIAL}",
+                    usernameVariable: 'USERNAME',
+                    passwordVariable: 'PASSWORD'
+                )]) {
+                    sh """
+                    docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
+                    docker push ${REGISTRY}/${IMAGE_NAME}:latest
+                    """
+                }
             }
         }
     }
