@@ -1580,63 +1580,153 @@
 
 
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         REGISTRY = "localhost:8082"
+//         IMAGE_NAME = "ecommerce-web"
+
+//         SONAR_TOKEN = credentials('sonar-token-2002')
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//         K8S_SECRET_NAME = "ecommerce-k8s-secret"
+//     }
+
+//     stages {
+
+//         stage('Checkout Code') {
+//             steps {
+//                 deleteDir()
+//                 git branch: 'main',
+//                     credentialsId: "${GIT_CREDENTIAL}",
+//                     url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project.git'
+//             }
+//         }
+
+//         stage('Declarative Agent Actions') {
+//             steps {
+//                 echo "Preparing pipeline environment..."
+//             }
+//         }
+
+//         stage('Create Kubernetes Secret') {
+//             steps {
+//                 sh """
+//                 kubectl create secret generic ${K8S_SECRET_NAME} \
+//                 --from-literal=username='admin' \
+//                 --from-literal=password='admin123' --dry-run=client -o yaml | kubectl apply -f -
+//                 """
+//             }
+//         }
+
+//         stage('Create Application Secrets') {
+//             steps {
+//                 echo "Application secrets setup (e.g., env variables, API keys)..."
+//                 // Add any secret creation scripts here if required
+//             }
+//         }
+
+//         stage('Create Docker Registry Secret') {
+//             steps {
+//                 sh """
+//                 kubectl create secret docker-registry docker-reg-cred \
+//                 --docker-server=${REGISTRY} \
+//                 --docker-username=${DOCKER_CREDENTIAL} \
+//                 --docker-password='PLACE_PASSWORD_HERE' \
+//                 --docker-email='admin@local' --dry-run=client -o yaml | kubectl apply -f -
+//                 """
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 withSonarQubeEnv("${SONAR_SERVER}") {
+//                     sh """
+//                     sonar-scanner \
+//                     -Dsonar.projectKey=ecommerce_django_project \
+//                     -Dsonar.sources=. \
+//                     -Dsonar.host.url=http://sonarqube.imcc.com \
+//                     -Dsonar.login=${SONAR_TOKEN}
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
+//             }
+//         }
+
+//         stage('Push to Nexus Registry') {
+//             steps {
+//                 withCredentials([usernamePassword(
+//                     credentialsId: "${DOCKER_CREDENTIAL}",
+//                     usernameVariable: 'USERNAME',
+//                     passwordVariable: 'PASSWORD'
+//                 )]) {
+//                     sh """
+//                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
+//                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Deploy to Kubernetes') {
+//             steps {
+//                 sh """
+//                 kubectl apply -f deployment.yaml
+//                 kubectl apply -f service.yaml
+//                 """
+//             }
+//         }
+
+//     }
+
+//     post {
+//         success {
+//             echo "🚀 Pipeline executed successfully!"
+//         }
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//     }
+// }
+
+
+
+
 pipeline {
     agent any
 
     environment {
-        REGISTRY = "localhost:8082"
-        IMAGE_NAME = "ecommerce-web"
-
+        REGISTRY = "nexus.imcc.com"
+        IMAGE_NAME = "ecommerce"
+        
+        // Correct SonarQube token ID (your credential ID)
         SONAR_TOKEN = credentials('sonar-token-2002')
+
         SONAR_SERVER = "SonarQubeServer"
         DOCKER_CREDENTIAL = "nexus-docker-cred"
         GIT_CREDENTIAL = "github-cred"
-        K8S_SECRET_NAME = "ecommerce-k8s-secret"
     }
 
     stages {
 
         stage('Checkout Code') {
             steps {
-                deleteDir()
                 git branch: 'main',
-                    credentialsId: "${GIT_CREDENTIAL}",
-                    url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project.git'
+                    url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project',
+                    credentialsId: "${GIT_CREDENTIAL}"
             }
         }
 
-        stage('Declarative Agent Actions') {
+        stage('Install Dependencies') {
             steps {
-                echo "Preparing pipeline environment..."
-            }
-        }
-
-        stage('Create Kubernetes Secret') {
-            steps {
-                sh """
-                kubectl create secret generic ${K8S_SECRET_NAME} \
-                --from-literal=username='admin' \
-                --from-literal=password='admin123' --dry-run=client -o yaml | kubectl apply -f -
-                """
-            }
-        }
-
-        stage('Create Application Secrets') {
-            steps {
-                echo "Application secrets setup (e.g., env variables, API keys)..."
-                // Add any secret creation scripts here if required
-            }
-        }
-
-        stage('Create Docker Registry Secret') {
-            steps {
-                sh """
-                kubectl create secret docker-registry docker-reg-cred \
-                --docker-server=${REGISTRY} \
-                --docker-username=${DOCKER_CREDENTIAL} \
-                --docker-password='PLACE_PASSWORD_HERE' \
-                --docker-email='admin@local' --dry-run=client -o yaml | kubectl apply -f -
-                """
+                sh 'npm install'
             }
         }
 
@@ -1645,53 +1735,51 @@ pipeline {
                 withSonarQubeEnv("${SONAR_SERVER}") {
                     sh """
                     sonar-scanner \
-                    -Dsonar.projectKey=ecommerce_django_project \
-                    -Dsonar.sources=. \
-                    -Dsonar.host.url=http://sonarqube.imcc.com \
-                    -Dsonar.login=${SONAR_TOKEN}
+                      -Dsonar.projectKey=2401013_ecommerce \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=http://sonarqube.imcc.com \
+                      -Dsonar.login=${SONAR_TOKEN}
                     """
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
-            }
-        }
-
-        stage('Push to Nexus Registry') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "${DOCKER_CREDENTIAL}",
-                    usernameVariable: 'USERNAME',
-                    passwordVariable: 'PASSWORD'
-                )]) {
+                script {
                     sh """
-                    docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
-                    docker push ${REGISTRY}/${IMAGE_NAME}:latest
+                    docker build -t ${REGISTRY}/docker-hosted/${IMAGE_NAME}:latest .
                     """
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Login to Nexus Registry') {
             steps {
-                sh """
-                kubectl apply -f deployment.yaml
-                kubectl apply -f service.yaml
-                """
+                script {
+                    sh """
+                    echo $DOCKER_CREDENTIAL_PSW | docker login ${REGISTRY} -u $DOCKER_CREDENTIAL_USR --password-stdin
+                    """
+                }
             }
         }
 
-    }
-
-    post {
-        success {
-            echo "🚀 Pipeline executed successfully!"
-        }
-        failure {
-            echo "❌ Pipeline failed!"
+        stage('Push Docker Image to Nexus') {
+            steps {
+                script {
+                    sh """
+                    docker push ${REGISTRY}/docker-hosted/${IMAGE_NAME}:latest
+                    """
+                }
+            }
         }
     }
 }
