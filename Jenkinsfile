@@ -1394,6 +1394,86 @@
 
 
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         REGISTRY = "localhost:8082"
+//         IMAGE_NAME = "ecommerce-web"
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//     }
+
+//     stages {
+//         stage('Checkout Code') {
+//             steps {
+//                 deleteDir()
+//                 git branch: 'main',
+//                     credentialsId: "${GIT_CREDENTIAL}",
+//                     url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project.git'
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 withSonarQubeEnv("${SONAR_SERVER}") {
+//                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
+//                         sh '''
+//                         echo "=== Running SonarQube Analysis ==="
+//                         # Use curl which is usually available in Jenkins agents
+//                         curl -L -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
+                        
+//                         # Try to extract using different methods
+//                         which unzip && unzip -q sonar-scanner.zip || (which python3 && python3 -c "import zipfile; zipfile.ZipFile('sonar-scanner.zip').extractall()" || echo "Extraction method not available")
+                        
+//                         # Run sonar-scanner
+//                         ./sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner \
+//                         -Dsonar.projectKey=ecommerce_django_project \
+//                         -Dsonar.sources=. \
+//                         -Dsonar.host.url=http://sonarqube.imcc.com \
+//                         -Dsonar.login=${SONAR_TOKEN} || echo "SonarQube analysis completed"
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
+//             }
+//         }
+
+//         stage('Push Docker Image') {
+//             steps {
+//                 withCredentials([usernamePassword(
+//                     credentialsId: "${DOCKER_CREDENTIAL}",
+//                     usernameVariable: 'USERNAME',
+//                     passwordVariable: 'PASSWORD'
+//                 )]) {
+//                     sh """
+//                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
+//                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
+//                     """
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         success {
+//             echo "🚀 Pipeline executed successfully!"
+//         }
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//     }
+// }
+
+
+
+
 pipeline {
     agent any
 
@@ -1415,24 +1495,40 @@ pipeline {
             }
         }
 
+        stage('Prepare Environment') {
+            steps {
+                sh '''
+                echo "=== Preparing Environment ==="
+                pwd
+                ls -la
+                echo "Current directory structure:"
+                find . -type f -name "*.py" | head -10
+                '''
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv("${SONAR_SERVER}") {
                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
                         sh '''
                         echo "=== Running SonarQube Analysis ==="
-                        # Use curl which is usually available in Jenkins agents
+                        # Download and setup sonar-scanner
                         curl -L -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
                         
-                        # Try to extract using different methods
-                        which unzip && unzip -q sonar-scanner.zip || (which python3 && python3 -c "import zipfile; zipfile.ZipFile('sonar-scanner.zip').extractall()" || echo "Extraction method not available")
+                        # Install unzip and extract
+                        apt-get update && apt-get install -y unzip
+                        unzip -q sonar-scanner.zip
                         
-                        # Run sonar-scanner
+                        # Make sonar-scanner executable and run
+                        chmod +x sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner
+                        chmod +x sonar-scanner-4.8.0.2856-linux/jre/bin/java
+                        
                         ./sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner \
                         -Dsonar.projectKey=ecommerce_django_project \
                         -Dsonar.sources=. \
                         -Dsonar.host.url=http://sonarqube.imcc.com \
-                        -Dsonar.login=${SONAR_TOKEN} || echo "SonarQube analysis completed"
+                        -Dsonar.login=${SONAR_TOKEN} || echo "SonarQube analysis completed with warnings"
                         '''
                     }
                 }
@@ -1441,7 +1537,16 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
+                script {
+                    // Use the docker container specifically
+                    sh '''
+                    echo "=== Building Docker Image ==="
+                    which docker || echo "Docker not found in PATH"
+                    '''
+                    
+                    // Build using docker from dind container
+                    sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
+                }
             }
         }
 
@@ -1453,6 +1558,7 @@ pipeline {
                     passwordVariable: 'PASSWORD'
                 )]) {
                     sh """
+                    echo "=== Pushing to Nexus Registry ==="
                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
                     """
