@@ -1579,7 +1579,7 @@
 
 
 
-
+//Final code:_
 // pipeline {
 //     agent any
 
@@ -1699,16 +1699,106 @@
 
 
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         REGISTRY = "nexus.imcc.com"
+//         IMAGE_NAME = "ecommerce"
+        
+//         // Correct SonarQube token ID (your credential ID)
+//         SONAR_TOKEN = credentials('sonar-token-2002')
+
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//     }
+
+//     stages {
+
+//         stage('Checkout Code') {
+//             steps {
+//                 git branch: 'main',
+//                     url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project',
+//                     credentialsId: "${GIT_CREDENTIAL}"
+//             }
+//         }
+
+//         stage('Install Dependencies') {
+//             steps {
+//                 sh 'npm install'
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 withSonarQubeEnv("${SONAR_SERVER}") {
+//                     sh """
+//                     sonar-scanner \
+//                       -Dsonar.projectKey=2401013_ecommerce \
+//                       -Dsonar.sources=. \
+//                       -Dsonar.host.url=http://sonarqube.imcc.com \
+//                       -Dsonar.login=${SONAR_TOKEN}
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Quality Gate') {
+//             steps {
+//                 timeout(time: 2, unit: 'MINUTES') {
+//                     waitForQualityGate abortPipeline: true
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 script {
+//                     sh """
+//                     docker build -t ${REGISTRY}/docker-hosted/${IMAGE_NAME}:latest .
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Login to Nexus Registry') {
+//             steps {
+//                 script {
+//                     sh """
+//                     echo $DOCKER_CREDENTIAL_PSW | docker login ${REGISTRY} -u $DOCKER_CREDENTIAL_USR --password-stdin
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Push Docker Image to Nexus') {
+//             steps {
+//                 script {
+//                     sh """
+//                     docker push ${REGISTRY}/docker-hosted/${IMAGE_NAME}:latest
+//                     """
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
+
 pipeline {
-    agent any
+
+    agent {
+        docker {
+            image 'node:18-alpine'
+            args '--privileged -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     environment {
         REGISTRY = "nexus.imcc.com"
         IMAGE_NAME = "ecommerce"
-        
-        // Correct SonarQube token ID (your credential ID)
         SONAR_TOKEN = credentials('sonar-token-2002')
-
         SONAR_SERVER = "SonarQubeServer"
         DOCKER_CREDENTIAL = "nexus-docker-cred"
         GIT_CREDENTIAL = "github-cred"
@@ -1718,9 +1808,9 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project',
-                    credentialsId: "${GIT_CREDENTIAL}"
+                git credentialsId: "${GIT_CREDENTIAL}",
+                    url: "https://github.com/Shraddha06-Bhakare/imcc-semester1-project",
+                    branch: "main"
             }
         }
 
@@ -1733,13 +1823,14 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv("${SONAR_SERVER}") {
-                    sh """
-                    sonar-scanner \
-                      -Dsonar.projectKey=2401013_ecommerce \
-                      -Dsonar.sources=. \
-                      -Dsonar.host.url=http://sonarqube.imcc.com \
-                      -Dsonar.login=${SONAR_TOKEN}
-                    """
+                    sh '''
+                        npx sonar-scanner \
+                        -Dsonar.projectKey=2401013_ecommerce \
+                        -Dsonar.projectName=2401013_ecommerce \
+                        -Dsonar.sources=./ \
+                        -Dsonar.host.url=http://sonarqube.imcc.com \
+                        -Dsonar.login=$SONAR_TOKEN
+                    '''
                 }
             }
         }
@@ -1754,32 +1845,36 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh """
-                    docker build -t ${REGISTRY}/docker-hosted/${IMAGE_NAME}:latest .
-                    """
-                }
+                sh """
+                    docker build -t ${REGISTRY}/docker-hosted/${IMAGE_NAME}:1.0 .
+                """
             }
         }
 
         stage('Login to Nexus Registry') {
             steps {
-                script {
-                    sh """
-                    echo $DOCKER_CREDENTIAL_PSW | docker login ${REGISTRY} -u $DOCKER_CREDENTIAL_USR --password-stdin
-                    """
-                }
+                sh """
+                    echo "${DOCKER_CREDENTIAL_PSW}" | docker login ${REGISTRY} \
+                    -u "${DOCKER_CREDENTIAL_USR}" --password-stdin
+                """
             }
         }
 
         stage('Push Docker Image to Nexus') {
             steps {
-                script {
-                    sh """
-                    docker push ${REGISTRY}/docker-hosted/${IMAGE_NAME}:latest
-                    """
-                }
+                sh """
+                    docker push ${REGISTRY}/docker-hosted/${IMAGE_NAME}:1.0
+                """
             }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline executed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed. Please check logs."
         }
     }
 }
