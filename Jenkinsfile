@@ -2023,135 +2023,324 @@
 
 
 
+// pipeline {
+//     agent {
+//         kubernetes {
+//             yaml '''
+// apiVersion: "v1"
+// kind: "Pod"
+// metadata:
+//   labels:
+//     jenkins: "slave"
+// spec:
+//   containers:
+//   - name: node
+//     image: node:18
+//     command: ["cat"]
+//     tty: true
+//     volumeMounts:
+//     - name: workspace-volume
+//       mountPath: /home/jenkins/agent
+//   - name: docker
+//     image: docker:24-dind
+//     command:
+//     - "dockerd-entrypoint.sh"
+//     securityContext:
+//       privileged: true
+//     tty: true
+//     volumeMounts:
+//     - name: dind-storage
+//       mountPath: /var/lib/docker
+//     - name: workspace-volume
+//       mountPath: /home/jenkins/agent
+//   - name: docker-cli
+//     image: docker:24-cli
+//     command: ["cat"]
+//     tty: true
+//     volumeMounts:
+//     - name: docker-sock
+//       mountPath: /var/run
+//     - name: workspace-volume
+//       mountPath: /home/jenkins/agent
+//   - name: jnlp
+//     image: jenkins/inbound-agent:latest
+//     env:
+//     - name: JENKINS_URL
+//       value: http://my-jenkins.jenkins.svc.cluster.local:8080/
+//     volumeMounts:
+//     - name: workspace-volume
+//       mountPath: /home/jenkins/agent
+//   volumes:
+//   - name: docker-sock
+//     emptyDir: {}
+//   - name: dind-storage
+//     emptyDir: {}
+//   - name: workspace-volume
+//     emptyDir: {}
+// '''
+//         }
+//     }
+
+//     environment {
+//         REGISTRY = "nexus.imcc.com/docker-hosted"
+//         IMAGE_NAME = "ecommerce"
+//     }
+
+//     stages {
+//         stage('Checkout Code') {
+//             steps {
+//                 container('node') {
+//                     git url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project',
+//                         credentialsId: 'github-cred',
+//                         branch: 'main'
+//                 }
+//             }
+//         }
+
+//         stage('Install Dependencies') {
+//             steps {
+//                 container('node') {
+//                     dir('ecommerce') {      // FIXED
+//                         sh 'npm install'
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             environment {
+//                 SONAR_SERVER = 'sonarqube'
+//             }
+//             steps {
+//                 container('node') {
+//                     withSonarQubeEnv("${SONAR_SERVER}") {
+//                         dir('ecommerce') {  // FIXED
+//                             sh '''
+//                                 sonar-scanner \
+//                                 -Dsonar.projectKey=2401013_ecommerce \
+//                                 -Dsonar.sources=. \
+//                                 -Dsonar.host.url=http://sonarqube.imcc.com/ \
+//                                 -Dsonar.login=$SONAR_TOKEN
+//                             '''
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Quality Gate') {
+//             steps {
+//                 waitForQualityGate abortPipeline: false
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 container('docker-cli') {
+//                     dir('ecommerce') {  // FIXED
+//                         sh """
+//                             docker build -t ${REGISTRY}/${IMAGE_NAME}:latest .
+//                         """
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Push Image') {
+//             steps {
+//                 container('docker-cli') {
+//                     sh """
+//                         echo "$NEXUS_PASSWORD" | docker login ${REGISTRY} -u "$NEXUS_USERNAME" --password-stdin
+//                         docker push ${REGISTRY}/${IMAGE_NAME}:latest
+//                     """
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//         success {
+//             echo "✅ Pipeline executed successfully!"
+//         }
+//     }
+// }
+
+
+
 pipeline {
+
     agent {
         kubernetes {
             yaml '''
-apiVersion: "v1"
-kind: "Pod"
+apiVersion: v1
+kind: Pod
 metadata:
   labels:
-    jenkins: "slave"
+    jenkins/label: "2401013-ecommerce-agent"
 spec:
-  containers:
-  - name: node
-    image: node:18
-    command: ["cat"]
-    tty: true
-    volumeMounts:
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
-  - name: docker
-    image: docker:24-dind
-    command:
-    - "dockerd-entrypoint.sh"
-    securityContext:
-      privileged: true
-    tty: true
-    volumeMounts:
-    - name: dind-storage
-      mountPath: /var/lib/docker
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
-  - name: docker-cli
-    image: docker:24-cli
-    command: ["cat"]
-    tty: true
-    volumeMounts:
-    - name: docker-sock
-      mountPath: /var/run
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
-  - name: jnlp
-    image: jenkins/inbound-agent:latest
-    env:
-    - name: JENKINS_URL
-      value: http://my-jenkins.jenkins.svc.cluster.local:8080/
-    volumeMounts:
-    - name: workspace-volume
-      mountPath: /home/jenkins/agent
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/os: "linux"
+
   volumes:
-  - name: docker-sock
-    emptyDir: {}
-  - name: dind-storage
-    emptyDir: {}
-  - name: workspace-volume
-    emptyDir: {}
+    - name: workspace-volume
+      emptyDir: {}
+    - name: kubeconfig-secret
+      secret:
+        secretName: kubeconfig-secret
+
+  containers:
+
+    - name: python
+      image: python:3.10
+      tty: true
+      command: ["cat"]
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
+
+    - name: sonar-scanner
+      image: sonarsource/sonar-scanner-cli
+      tty: true
+      command: ["cat"]
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
+
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      tty: true
+      command: ["cat"]
+      env:
+        - name: KUBECONFIG
+          value: /kube/config
+      securityContext:
+        runAsUser: 0
+      volumeMounts:
+        - name: kubeconfig-secret
+          mountPath: /kube/config
+          subPath: kubeconfig
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
+
+    - name: dind
+      image: docker:dind
+      args: ["--storage-driver=overlay2", "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"]
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
+
+    - name: jnlp
+      image: jenkins/inbound-agent:latest
+      env:
+        - name: JENKINS_AGENT_NAME
+          value: "2401013-ecommerce-agent"
+        - name: JENKINS_AGENT_WORKDIR
+          value: "/home/jenkins/agent"
+      volumeMounts:
+        - name: workspace-volume
+          mountPath: /home/jenkins/agent
 '''
         }
     }
 
     environment {
-        REGISTRY = "nexus.imcc.com/docker-hosted"
-        IMAGE_NAME = "ecommerce"
+
+        // Namespace
+        NAMESPACE = '2401013'
+
+        // Nexus Docker Registry
+        REGISTRY  = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
+        APP_NAME  = 'ecommerce'
+        IMAGE_TAG = 'latest'
+
+        BACKEND_IMAGE = "${REGISTRY}/${NAMESPACE}/${APP_NAME}-backend"
+
+        NEXUS_USER = 'student'
+        NEXUS_PASS = 'Changeme@2025'
+
+        // SonarQube
+        SONAR_PROJECT_KEY   = '2401013_ecommerce'
+        SONAR_HOST_URL      = 'http://sonarqube.imcc.com'
+        SONAR_PROJECT_TOKEN = 'sqp_d87fa2386ff55f6bf419f4fdf882d4db34a0edb4'
     }
 
     stages {
-        stage('Checkout Code') {
+
+        stage('Install Python Dependencies') {
             steps {
-                container('node') {
-                    git url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project',
-                        credentialsId: 'github-cred',
-                        branch: 'main'
+                container('python') {
+                    sh """
+                    pip install --no-cache-dir -r requirements.txt
+                    """
                 }
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Run SonarQube Analysis') {
             steps {
-                container('node') {
-                    dir('ecommerce') {      // FIXED
-                        sh 'npm install'
-                    }
+                container('sonar-scanner') {
+                    sh """
+                    sonar-scanner \
+                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=${SONAR_HOST_URL} \
+                      -Dsonar.login=${SONAR_PROJECT_TOKEN}
+                    """
                 }
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            environment {
-                SONAR_SERVER = 'sonarqube'
-            }
-            steps {
-                container('node') {
-                    withSonarQubeEnv("${SONAR_SERVER}") {
-                        dir('ecommerce') {  // FIXED
-                            sh '''
-                                sonar-scanner \
-                                -Dsonar.projectKey=2401013_ecommerce \
-                                -Dsonar.sources=. \
-                                -Dsonar.host.url=http://sonarqube.imcc.com/ \
-                                -Dsonar.login=$SONAR_TOKEN
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                waitForQualityGate abortPipeline: false
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                container('docker-cli') {
-                    dir('ecommerce') {  // FIXED
-                        sh """
-                            docker build -t ${REGISTRY}/${IMAGE_NAME}:latest .
-                        """
-                    }
+                container('dind') {
+                    sh '''
+                    # Wait until Docker daemon is fully ready
+                    while ! docker info > /dev/null 2>&1; do 
+                        sleep 3
+                    done
+
+                    docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -f ./Dockerfile .
+                    '''
                 }
             }
         }
 
-        stage('Push Image') {
+        stage('Login to Nexus Registry') {
             steps {
-                container('docker-cli') {
+                container('dind') {
                     sh """
-                        echo "$NEXUS_PASSWORD" | docker login ${REGISTRY} -u "$NEXUS_USERNAME" --password-stdin
-                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
+                    echo "$NEXUS_PASS" | docker login ${REGISTRY} -u "$NEXUS_USER" --password-stdin
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image to Nexus') {
+            steps {
+                container('dind') {
+                    sh """
+                    docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    sh """
+                    kubectl apply -f K8s/deployment.yaml -n ${NAMESPACE}
+                    kubectl apply -f K8s/service.yaml -n ${NAMESPACE}
+
+                    kubectl set image deployment/ecommerce-deployment ecommerce=${BACKEND_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
+
+                    kubectl rollout status deployment/ecommerce-deployment -n ${NAMESPACE}
                     """
                 }
             }
@@ -2159,12 +2348,11 @@ spec:
     }
 
     post {
-        failure {
-            echo "❌ Pipeline failed!"
+        success { 
+            echo "✅ Deployment Successful for 2401013 eCommerce Project!" 
         }
-        success {
-            echo "✅ Pipeline executed successfully!"
+        failure { 
+            echo "❌ Deployment Failed — Check Jenkins logs." 
         }
     }
 }
-
