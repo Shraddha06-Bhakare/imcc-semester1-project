@@ -38,26 +38,57 @@
 
 
 
-# Base image
+# # Base image
+# FROM python:3.10-slim
+
+# # Set workdir
+# WORKDIR /app
+
+# # Copy requirements
+# COPY requirements.txt /app/
+
+# # Install requirements
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# # Copy project files
+# COPY . /app/
+
+# # Expose Django port
+# EXPOSE 8000
+
+# # Add entrypoint
+# COPY entrypoint.sh /entrypoint.sh
+# RUN chmod +x /entrypoint.sh
+
+# ENTRYPOINT ["/entrypoint.sh"]
+
+
+
+
+# Use official Python image
 FROM python:3.10-slim
 
-# Set workdir
+# Set working directory
 WORKDIR /app
 
-# Copy requirements
-COPY requirements.txt /app/
-
-# Install requirements
-RUN pip install --no-cache-dir -r requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY . /app/
+COPY . .
+
+# Install Python dependencies
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+# Collect static files
+RUN python manage.py collectstatic --noinput
 
 # Expose Django port
 EXPOSE 8000
 
-# Add entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
+# Gunicorn command
+CMD ["gunicorn", "firstapp.wsgi:application", "--bind", "0.0.0.0:8000"]
