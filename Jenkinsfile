@@ -1474,18 +1474,128 @@
 
 
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         REGISTRY = "localhost:8082"
+//         IMAGE_NAME = "ecommerce-web"
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//     }
+
+//     stages {
+//         stage('Checkout Code') {
+//             steps {
+//                 deleteDir()
+//                 git branch: 'main',
+//                     credentialsId: "${GIT_CREDENTIAL}",
+//                     url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project.git'
+//             }
+//         }
+
+//         stage('Prepare Environment') {
+//             steps {
+//                 sh '''
+//                 echo "=== Preparing Environment ==="
+//                 pwd
+//                 ls -la
+//                 echo "Current directory structure:"
+//                 find . -type f -name "*.py" | head -10
+//                 '''
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 withSonarQubeEnv("${SONAR_SERVER}") {
+//                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
+//                         sh '''
+//                         echo "=== Running SonarQube Analysis ==="
+//                         # Download and setup sonar-scanner
+//                         curl -L -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
+                        
+//                         # Install unzip and extract
+//                         apt-get update && apt-get install -y unzip
+//                         unzip -q sonar-scanner.zip
+                        
+//                         # Make sonar-scanner executable and run
+//                         chmod +x sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner
+//                         chmod +x sonar-scanner-4.8.0.2856-linux/jre/bin/java
+                        
+//                         ./sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner \
+//                         -Dsonar.projectKey=ecommerce_django_project \
+//                         -Dsonar.sources=. \
+//                         -Dsonar.host.url=http://sonarqube.imcc.com \
+//                         -Dsonar.login=${SONAR_TOKEN} || echo "SonarQube analysis completed with warnings"
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 script {
+//                     // Use the docker container specifically
+//                     sh '''
+//                     echo "=== Building Docker Image ==="
+//                     which docker || echo "Docker not found in PATH"
+//                     '''
+                    
+//                     // Build using docker from dind container
+//                     sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
+//                 }
+//             }
+//         }
+
+//         stage('Push Docker Image') {
+//             steps {
+//                 withCredentials([usernamePassword(
+//                     credentialsId: "${DOCKER_CREDENTIAL}",
+//                     usernameVariable: 'USERNAME',
+//                     passwordVariable: 'PASSWORD'
+//                 )]) {
+//                     sh """
+//                     echo "=== Pushing to Nexus Registry ==="
+//                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
+//                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
+//                     """
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         success {
+//             echo "🚀 Pipeline executed successfully!"
+//         }
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//     }
+// }
+
+
+
+
 pipeline {
     agent any
 
     environment {
         REGISTRY = "localhost:8082"
         IMAGE_NAME = "ecommerce-web"
+
+        SONAR_TOKEN = credentials('sonar-token-2002')
         SONAR_SERVER = "SonarQubeServer"
         DOCKER_CREDENTIAL = "nexus-docker-cred"
         GIT_CREDENTIAL = "github-cred"
+        K8S_SECRET_NAME = "ecommerce-k8s-secret"
     }
 
     stages {
+
         stage('Checkout Code') {
             steps {
                 deleteDir()
@@ -1495,62 +1605,62 @@ pipeline {
             }
         }
 
-        stage('Prepare Environment') {
+        stage('Declarative Agent Actions') {
             steps {
-                sh '''
-                echo "=== Preparing Environment ==="
-                pwd
-                ls -la
-                echo "Current directory structure:"
-                find . -type f -name "*.py" | head -10
-                '''
+                echo "Preparing pipeline environment..."
+            }
+        }
+
+        stage('Create Kubernetes Secret') {
+            steps {
+                sh """
+                kubectl create secret generic ${K8S_SECRET_NAME} \
+                --from-literal=username='admin' \
+                --from-literal=password='admin123' --dry-run=client -o yaml | kubectl apply -f -
+                """
+            }
+        }
+
+        stage('Create Application Secrets') {
+            steps {
+                echo "Application secrets setup (e.g., env variables, API keys)..."
+                // Add any secret creation scripts here if required
+            }
+        }
+
+        stage('Create Docker Registry Secret') {
+            steps {
+                sh """
+                kubectl create secret docker-registry docker-reg-cred \
+                --docker-server=${REGISTRY} \
+                --docker-username=${DOCKER_CREDENTIAL} \
+                --docker-password='PLACE_PASSWORD_HERE' \
+                --docker-email='admin@local' --dry-run=client -o yaml | kubectl apply -f -
+                """
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv("${SONAR_SERVER}") {
-                    withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                        echo "=== Running SonarQube Analysis ==="
-                        # Download and setup sonar-scanner
-                        curl -L -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
-                        
-                        # Install unzip and extract
-                        apt-get update && apt-get install -y unzip
-                        unzip -q sonar-scanner.zip
-                        
-                        # Make sonar-scanner executable and run
-                        chmod +x sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner
-                        chmod +x sonar-scanner-4.8.0.2856-linux/jre/bin/java
-                        
-                        ./sonar-scanner-4.8.0.2856-linux/bin/sonar-scanner \
-                        -Dsonar.projectKey=ecommerce_django_project \
-                        -Dsonar.sources=. \
-                        -Dsonar.host.url=http://sonarqube.imcc.com \
-                        -Dsonar.login=${SONAR_TOKEN} || echo "SonarQube analysis completed with warnings"
-                        '''
-                    }
+                    sh """
+                    sonar-scanner \
+                    -Dsonar.projectKey=ecommerce_django_project \
+                    -Dsonar.sources=. \
+                    -Dsonar.host.url=http://sonarqube.imcc.com \
+                    -Dsonar.login=${SONAR_TOKEN}
+                    """
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    // Use the docker container specifically
-                    sh '''
-                    echo "=== Building Docker Image ==="
-                    which docker || echo "Docker not found in PATH"
-                    '''
-                    
-                    // Build using docker from dind container
-                    sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
-                }
+                sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push to Nexus Registry') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: "${DOCKER_CREDENTIAL}",
@@ -1558,13 +1668,22 @@ pipeline {
                     passwordVariable: 'PASSWORD'
                 )]) {
                     sh """
-                    echo "=== Pushing to Nexus Registry ==="
                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
                     """
                 }
             }
         }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh """
+                kubectl apply -f deployment.yaml
+                kubectl apply -f service.yaml
+                """
+            }
+        }
+
     }
 
     post {
