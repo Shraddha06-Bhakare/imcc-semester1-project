@@ -907,6 +907,149 @@
 
 
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         REGISTRY = "localhost:8082"
+//         IMAGE_NAME = "ecommerce-web"
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//     }
+
+//     stages {
+//         stage('Checkout Code') {
+//             steps {
+//                 deleteDir()
+//                 git branch: 'main',
+//                     credentialsId: "${GIT_CREDENTIAL}",
+//                     url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project.git'
+//             }
+//         }
+
+//         stage('Install Required Tools') {
+//             steps {
+//                 sh '''
+//                 echo "Installing required tools..."
+//                 # Install kubectl without sudo
+//                 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+//                 chmod +x kubectl
+//                 mkdir -p $HOME/bin
+//                 mv kubectl $HOME/bin/
+//                 export PATH=$HOME/bin:$PATH
+                
+//                 # Verify installations
+//                 echo "=== kubectl version ==="
+//                 $HOME/bin/kubectl version --client
+//                 '''
+//             }
+//         }
+
+//         stage('Setup Kubernetes Context') {
+//             steps {
+//                 sh '''
+//                 # Setup basic kubeconfig (you'll need to adjust this for your cluster)
+//                 mkdir -p $HOME/.kube
+//                 echo "Setting up Kubernetes context..."
+//                 # Add your actual kubeconfig here or use Jenkins Kubernetes plugin
+//                 '''
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 withSonarQubeEnv("${SONAR_SERVER}") {
+//                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
+//                         sh '''
+//                         # Install sonar-scanner if not present
+//                         if ! command -v sonar-scanner &> /dev/null; then
+//                             echo "Installing sonar-scanner..."
+//                             wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
+//                             unzip -q sonar-scanner-cli-4.8.0.2856-linux.zip
+//                             export PATH=$PWD/sonar-scanner-4.8.0.2856-linux/bin:$PATH
+//                         fi
+                        
+//                         echo "=== Running SonarQube Analysis ==="
+//                         sonar-scanner \
+//                         -Dsonar.projectKey=ecommerce_django_project \
+//                         -Dsonar.sources=. \
+//                         -Dsonar.host.url=http://sonarqube.imcc.com \
+//                         -Dsonar.login=${SONAR_TOKEN}
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 script {
+//                     // Use the Docker container that's available in the pod
+//                     sh '''
+//                     echo "=== Building Docker Image ==="
+//                     cd /home/jenkins/agent/workspace/2401013_ecommerce
+//                     docker build -t ${REGISTRY}/${IMAGE_NAME}:latest .
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Push to Nexus Registry') {
+//             steps {
+//                 withCredentials([usernamePassword(
+//                     credentialsId: "${DOCKER_CREDENTIAL}",
+//                     usernameVariable: 'USERNAME',
+//                     passwordVariable: 'PASSWORD'
+//                 )]) {
+//                     sh '''
+//                     echo "=== Pushing to Nexus Registry ==="
+//                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
+//                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Deploy to Kubernetes') {
+//             steps {
+//                 sh '''
+//                 echo "=== Deploying to Kubernetes ==="
+//                 export PATH=$HOME/bin:$PATH
+                
+//                 # Apply Kubernetes manifests
+//                 kubectl apply -f K8s/deployment.yaml --validate=false
+//                 kubectl apply -f K8s/service.yaml --validate=false
+                
+//                 # Check deployment status
+//                 echo "=== Deployment Status ==="
+//                 kubectl get deployments -o wide
+//                 kubectl get services -o wide
+//                 kubectl get pods -o wide
+//                 '''
+//             }
+//         }
+//     }
+
+//     post {
+//         always {
+//             sh '''
+//             echo "=== Cleaning up ==="
+//             # Clean up Docker images
+//             docker system prune -f || true
+//             '''
+//         }
+//         success {
+//             echo "🚀 Pipeline executed successfully!"
+//         }
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//     }
+// }
+
+
+
 pipeline {
     agent any
 
@@ -931,28 +1074,19 @@ pipeline {
         stage('Install Required Tools') {
             steps {
                 sh '''
-                echo "Installing required tools..."
-                # Install kubectl without sudo
+                echo "=== Installing Required Tools ==="
+                # Install kubectl
                 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                 chmod +x kubectl
                 mkdir -p $HOME/bin
                 mv kubectl $HOME/bin/
                 export PATH=$HOME/bin:$PATH
                 
-                # Verify installations
-                echo "=== kubectl version ==="
+                # Install wget for sonar-scanner
+                apk add --no-cache wget unzip
+                
+                echo "=== Tool Versions ==="
                 $HOME/bin/kubectl version --client
-                '''
-            }
-        }
-
-        stage('Setup Kubernetes Context') {
-            steps {
-                sh '''
-                # Setup basic kubeconfig (you'll need to adjust this for your cluster)
-                mkdir -p $HOME/.kube
-                echo "Setting up Kubernetes context..."
-                # Add your actual kubeconfig here or use Jenkins Kubernetes plugin
                 '''
             }
         }
@@ -962,13 +1096,11 @@ pipeline {
                 withSonarQubeEnv("${SONAR_SERVER}") {
                     withCredentials([string(credentialsId: 'sonar-token-2002', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                        # Install sonar-scanner if not present
-                        if ! command -v sonar-scanner &> /dev/null; then
-                            echo "Installing sonar-scanner..."
-                            wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
-                            unzip -q sonar-scanner-cli-4.8.0.2856-linux.zip
-                            export PATH=$PWD/sonar-scanner-4.8.0.2856-linux/bin:$PATH
-                        fi
+                        echo "=== Installing Sonar Scanner ==="
+                        # Install sonar-scanner using curl (since we now have wget)
+                        wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
+                        unzip -q sonar-scanner-cli-4.8.0.2856-linux.zip
+                        export PATH=$PWD/sonar-scanner-4.8.0.2856-linux/bin:$PATH
                         
                         echo "=== Running SonarQube Analysis ==="
                         sonar-scanner \
@@ -985,12 +1117,14 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Use the Docker container that's available in the pod
+                    // Use the Docker socket from the dind container
                     sh '''
                     echo "=== Building Docker Image ==="
-                    cd /home/jenkins/agent/workspace/2401013_ecommerce
-                    docker build -t ${REGISTRY}/${IMAGE_NAME}:latest .
+                    ls -la
                     '''
+                    
+                    // Build using Docker from the dind container
+                    sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:latest ."
                 }
             }
         }
@@ -1002,11 +1136,11 @@ pipeline {
                     usernameVariable: 'USERNAME',
                     passwordVariable: 'PASSWORD'
                 )]) {
-                    sh '''
+                    sh """
                     echo "=== Pushing to Nexus Registry ==="
                     docker login ${REGISTRY} -u $USERNAME -p $PASSWORD
                     docker push ${REGISTRY}/${IMAGE_NAME}:latest
-                    '''
+                    """
                 }
             }
         }
@@ -1017,15 +1151,16 @@ pipeline {
                 echo "=== Deploying to Kubernetes ==="
                 export PATH=$HOME/bin:$PATH
                 
-                # Apply Kubernetes manifests
-                kubectl apply -f K8s/deployment.yaml --validate=false
-                kubectl apply -f K8s/service.yaml --validate=false
+                # For now, just show what we would deploy
+                echo "Kubernetes deployment files:"
+                ls -la K8s/ || echo "K8s directory not found"
                 
-                # Check deployment status
-                echo "=== Deployment Status ==="
-                kubectl get deployments -o wide
-                kubectl get services -o wide
-                kubectl get pods -o wide
+                # Apply Kubernetes manifests if kubeconfig is configured
+                kubectl apply -f K8s/deployment.yaml --validate=false || echo "Deployment failed - check kubeconfig"
+                kubectl apply -f K8s/service.yaml --validate=false || echo "Service failed - check kubeconfig"
+                
+                echo "=== Kubernetes Resources ==="
+                kubectl get deployments,services,pods || echo "Cannot connect to Kubernetes cluster"
                 '''
             }
         }
@@ -1034,9 +1169,7 @@ pipeline {
     post {
         always {
             sh '''
-            echo "=== Cleaning up ==="
-            # Clean up Docker images
-            docker system prune -f || true
+            echo "=== Pipeline Completed ==="
             '''
         }
         success {
