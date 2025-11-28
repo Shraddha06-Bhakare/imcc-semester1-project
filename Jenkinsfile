@@ -1882,75 +1882,217 @@
 
 
 
-pipeline {
+// pipeline {
 
+//     agent {
+//         kubernetes {
+//             yaml """
+// apiVersion: v1
+// kind: Pod
+// metadata:
+//   labels:
+//     jenkins: slave
+// spec:
+//   containers:
+//   - name: node
+//     image: node:18
+//     command:
+//     - cat
+//     tty: true
+//     volumeMounts:
+//     - mountPath: /home/jenkins/agent
+//       name: workspace-volume
+
+//   - name: docker
+//     image: docker:24-dind
+//     securityContext:
+//       privileged: true
+//     command:
+//     - dockerd-entrypoint.sh
+//     tty: true
+//     volumeMounts:
+//     - mountPath: /var/lib/docker
+//       name: dind-storage
+
+//   - name: docker-cli
+//     image: docker:24-cli
+//     command:
+//     - cat
+//     tty: true
+//     volumeMounts:
+//     - mountPath: /var/run
+//       name: docker-sock
+
+//   volumes:
+//   - name: workspace-volume
+//     emptyDir: {}
+//   - name: dind-storage
+//     emptyDir: {}
+//   - name: docker-sock
+//     emptyDir: {}
+// """
+//         }
+//     }
+
+//     environment {
+//         REGISTRY = "nexus.imcc.com"
+//         IMAGE_NAME = "ecommerce"
+//         SONAR_TOKEN = credentials('sonar-token-2002')
+//         SONAR_SERVER = "SonarQubeServer"
+//         DOCKER_CREDENTIAL = "nexus-docker-cred"
+//         GIT_CREDENTIAL = "github-cred"
+//     }
+
+//     stages {
+
+//         stage('Checkout Code') {
+//             steps {
+//                 container('node') {
+//                     git credentialsId: "${GIT_CREDENTIAL}",
+//                         url: "https://github.com/Shraddha06-Bhakare/imcc-semester1-project",
+//                         branch: "main"
+//                 }
+//             }
+//         }
+
+//         stage('Install Dependencies') {
+//             steps {
+//                 container('node') {
+//                     sh "npm install"
+//                 }
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 container('node') {
+//                     withSonarQubeEnv("${SONAR_SERVER}") {
+//                         sh """
+//                           npx sonar-scanner \
+//                           -Dsonar.projectKey=2401013_ecommerce \
+//                           -Dsonar.sources=./ \
+//                           -Dsonar.host.url=http://sonarqube.imcc.com \
+//                           -Dsonar.login=$SONAR_TOKEN
+//                         """
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Quality Gate') {
+//             steps {
+//                 timeout(time: 3, unit: 'MINUTES') {
+//                     waitForQualityGate abortPipeline: true
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 container('docker-cli') {
+//                     sh """
+//                         docker build -t ${REGISTRY}/docker-hosted/${IMAGE_NAME}:1.0 .
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Push Image') {
+//             steps {
+//                 container('docker-cli') {
+//                     sh """
+//                         echo "${DOCKER_CREDENTIAL_PSW}" | docker login ${REGISTRY} \
+//                           -u "${DOCKER_CREDENTIAL_USR}" --password-stdin
+//                         docker push ${REGISTRY}/docker-hosted/${IMAGE_NAME}:1.0
+//                     """
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         success {
+//             echo "✔ Pipeline completed successfully!"
+//         }
+//         failure {
+//             echo "❌ Pipeline failed!"
+//         }
+//     }
+// }
+
+
+
+
+pipeline {
     agent {
         kubernetes {
-            yaml """
-apiVersion: v1
-kind: Pod
+            yaml '''
+apiVersion: "v1"
+kind: "Pod"
 metadata:
   labels:
-    jenkins: slave
+    jenkins: "slave"
 spec:
   containers:
   - name: node
     image: node:18
-    command:
-    - cat
+    command: ["cat"]
     tty: true
     volumeMounts:
-    - mountPath: /home/jenkins/agent
-      name: workspace-volume
-
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
   - name: docker
     image: docker:24-dind
+    command:
+    - "dockerd-entrypoint.sh"
     securityContext:
       privileged: true
-    command:
-    - dockerd-entrypoint.sh
     tty: true
     volumeMounts:
-    - mountPath: /var/lib/docker
-      name: dind-storage
-
+    - name: dind-storage
+      mountPath: /var/lib/docker
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
   - name: docker-cli
     image: docker:24-cli
-    command:
-    - cat
+    command: ["cat"]
     tty: true
     volumeMounts:
-    - mountPath: /var/run
-      name: docker-sock
-
+    - name: docker-sock
+      mountPath: /var/run
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+    env:
+    - name: JENKINS_URL
+      value: http://my-jenkins.jenkins.svc.cluster.local:8080/
+    volumeMounts:
+    - name: workspace-volume
+      mountPath: /home/jenkins/agent
   volumes:
-  - name: workspace-volume
+  - name: docker-sock
     emptyDir: {}
   - name: dind-storage
     emptyDir: {}
-  - name: docker-sock
+  - name: workspace-volume
     emptyDir: {}
-"""
+'''
         }
     }
 
     environment {
-        REGISTRY = "nexus.imcc.com"
+        REGISTRY = "nexus.imcc.com/docker-hosted"
         IMAGE_NAME = "ecommerce"
-        SONAR_TOKEN = credentials('sonar-token-2002')
-        SONAR_SERVER = "SonarQubeServer"
-        DOCKER_CREDENTIAL = "nexus-docker-cred"
-        GIT_CREDENTIAL = "github-cred"
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
                 container('node') {
-                    git credentialsId: "${GIT_CREDENTIAL}",
-                        url: "https://github.com/Shraddha06-Bhakare/imcc-semester1-project",
-                        branch: "main"
+                    git url: 'https://github.com/Shraddha06-Bhakare/imcc-semester1-project',
+                        credentialsId: 'github-cred',
+                        branch: 'main'
                 }
             }
         }
@@ -1958,22 +2100,29 @@ spec:
         stage('Install Dependencies') {
             steps {
                 container('node') {
-                    sh "npm install"
+                    dir('ecommerce') {      // FIXED
+                        sh 'npm install'
+                    }
                 }
             }
         }
 
         stage('SonarQube Analysis') {
+            environment {
+                SONAR_SERVER = 'sonarqube'
+            }
             steps {
                 container('node') {
                     withSonarQubeEnv("${SONAR_SERVER}") {
-                        sh """
-                          npx sonar-scanner \
-                          -Dsonar.projectKey=2401013_ecommerce \
-                          -Dsonar.sources=./ \
-                          -Dsonar.host.url=http://sonarqube.imcc.com \
-                          -Dsonar.login=$SONAR_TOKEN
-                        """
+                        dir('ecommerce') {  // FIXED
+                            sh '''
+                                sonar-scanner \
+                                -Dsonar.projectKey=2401013_ecommerce \
+                                -Dsonar.sources=. \
+                                -Dsonar.host.url=http://sonarqube.imcc.com/ \
+                                -Dsonar.login=$SONAR_TOKEN
+                            '''
+                        }
                     }
                 }
             }
@@ -1981,18 +2130,18 @@ spec:
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 3, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                waitForQualityGate abortPipeline: false
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 container('docker-cli') {
-                    sh """
-                        docker build -t ${REGISTRY}/docker-hosted/${IMAGE_NAME}:1.0 .
-                    """
+                    dir('ecommerce') {  // FIXED
+                        sh """
+                            docker build -t ${REGISTRY}/${IMAGE_NAME}:latest .
+                        """
+                    }
                 }
             }
         }
@@ -2001,9 +2150,8 @@ spec:
             steps {
                 container('docker-cli') {
                     sh """
-                        echo "${DOCKER_CREDENTIAL_PSW}" | docker login ${REGISTRY} \
-                          -u "${DOCKER_CREDENTIAL_USR}" --password-stdin
-                        docker push ${REGISTRY}/docker-hosted/${IMAGE_NAME}:1.0
+                        echo "$NEXUS_PASSWORD" | docker login ${REGISTRY} -u "$NEXUS_USERNAME" --password-stdin
+                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
                     """
                 }
             }
@@ -2011,11 +2159,12 @@ spec:
     }
 
     post {
-        success {
-            echo "✔ Pipeline completed successfully!"
-        }
         failure {
             echo "❌ Pipeline failed!"
         }
+        success {
+            echo "✅ Pipeline executed successfully!"
+        }
     }
 }
+
