@@ -168,7 +168,7 @@ pipeline {
                     -Dsonar.projectKey=ecommerce_django_project \
                     -Dsonar.sources=. \
                     -Dsonar.host.url=http://sonarqube.imcc.com \
-                    -Dsonar.login=${SONAR_TOKEN}
+                    -Dsonar.login=${sonar-token-2002}
                     """
                 }
             }
