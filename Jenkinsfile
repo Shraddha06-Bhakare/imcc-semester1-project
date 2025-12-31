@@ -2541,6 +2541,140 @@
 
 
 
+//Ajinkya file:-
+// pipeline {
+//     agent {
+//         kubernetes {
+//             yaml '''
+// apiVersion: v1
+// kind: Pod
+// spec:
+//   containers:
+//   - name: sonar-scanner
+//     image: sonarsource/sonar-scanner-cli
+//     command: [ "cat" ]
+//     tty: true
+
+//   - name: kubectl
+//     image: bitnami/kubectl:latest
+//     command: [ "cat" ]
+//     tty: true
+//     securityContext:
+//       runAsUser: 0
+//       readOnlyRootFilesystem: false
+//     env:
+//     - name: KUBECONFIG
+//       value: /kube/config        
+//     volumeMounts:
+//     - name: kubeconfig-secret
+//       mountPath: /kube/config
+//       subPath: kubeconfig
+
+//   - name: dind
+//     image: docker:dind
+//     securityContext:
+//       privileged: true
+//     env:
+//     - name: DOCKER_TLS_CERTDIR
+//       value: ""
+//     volumeMounts:
+//     - name: docker-config
+//       mountPath: /etc/docker/daemon.json
+//       subPath: daemon.json
+
+//   volumes:
+//   - name: docker-config
+//     configMap:
+//       name: docker-daemon-config
+//   - name: kubeconfig-secret
+//     secret:
+//       secretName: kubeconfig-secret
+// '''
+//         }
+//     }
+
+//     stages {
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 container('dind') {
+//                     sh '''
+//                         sleep 15
+//                         docker build -t ecommerce:latest .
+//                         docker image ls
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Run Django Tests') {
+//             steps {
+//                 container('dind') {
+//                     sh '''
+//                         docker run --rm ecommerce:latest \
+//                         pytest --maxfail=1 --disable-warnings --cov=. --cov-report=xml || true
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('SonarQube Analysis') {
+//             steps {
+//                 container('sonar-scanner') {
+//                     withCredentials([string(credentialsId: 'sonar-token-2401013', variable: 'SONAR_TOKEN')]) {
+//                         sh '''
+//                         sonar-scanner \
+//                         -Dsonar.projectKey=2401013_ecommerce \
+//                         -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+//                         -Dsonar.login=$SONAR_TOKEN \
+//                         -Dsonar.python.coverage.reportPaths=coverage.xml
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Login To Docker Registry') {
+//             steps {
+//                 container('dind') {
+//                     sh '''
+//                     docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+//                     -u admin -p Changeme@2025
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Build, Tag & Push Image') {
+//             steps {
+//                 container('dind') {
+//                     sh '''
+//                     docker tag ecommerce:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401013-project/ecommerce:latest
+//                     docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401013-project/ecommerce:latest
+//                     docker image ls
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Deploy To Kubernetes') {
+//             steps {
+//                 container('kubectl') {
+//                     sh '''
+//                     kubectl apply -f K8s/deployment.yaml
+//                     kubectl apply -f K8s/service.yaml
+//                     kubectl rollout status deployment/ecommerce-deployment -n 2401013
+//                     '''
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
+
+
+
 
 pipeline {
     agent {
@@ -2619,20 +2753,23 @@ spec:
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                container('sonar-scanner') {
-                    withCredentials([string(credentialsId: 'sonar-token-2401013', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                        sonar-scanner \
-                        -Dsonar.projectKey=2401013_ecommerce \
-                        -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                        -Dsonar.login=$SONAR_TOKEN \
-                        -Dsonar.python.coverage.reportPaths=coverage.xml
-                        '''
-                    }
-                }
+    steps {
+        container('sonar-scanner') {
+            withCredentials([string(credentialsId: 'sonar-token-2401013', variable: 'SONAR_TOKEN')]) {
+                sh '''
+                sonar-scanner \
+                -Dsonar.projectKey=2401013_ecommerce \
+                -Dsonar.projectName=2401013_ecommerce \
+                -Dsonar.sources=. \
+                -Dsonar.language=py \
+                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                -Dsonar.login=$SONAR_TOKEN
+                '''
             }
         }
+    }
+}
+
 
         stage('Login To Docker Registry') {
             steps {
