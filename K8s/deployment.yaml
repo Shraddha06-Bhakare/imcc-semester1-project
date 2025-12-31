@@ -25,25 +25,162 @@
 
 
 
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: ecommerce-web-deployment
+#   labels:
+#     app: ecommerce-web
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: ecommerce-web
+#   template:
+#     metadata:
+#       labels:
+#         app: ecommerce-web
+#     spec:
+#       containers:
+#         - name: ecommerce-web
+#           image: localhost:8082/ecommerce-web:latest
+#           ports:
+#             - containerPort: 8000
+#           imagePullPolicy: Always
+
+
+
+# -------------------------------
+# PersistentVolumeClaim
+# -------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ecommerce-static-pvc
+  namespace: "2401013"
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ecommerce-web-deployment
-  labels:
-    app: ecommerce-web
+  name: ecommerce-deployment
+  namespace: "2401013"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ecommerce-web
+      app: ecommerce
   template:
     metadata:
       labels:
-        app: ecommerce-web
+        app: ecommerce
     spec:
+      imagePullSecrets:
+        - name: nexus-secret
       containers:
-        - name: ecommerce-web
-          image: localhost:8082/ecommerce-web:latest
+        - name: ecommerce
+          image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401013-project/ecommerce:latest
           ports:
             - containerPort: 8000
-          imagePullPolicy: Always
+
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: DB_NAME
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: mysql-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: mysql-config
+                  key: DB_PORT
+            - name: DEBUG
+              value: "0"
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+          volumeMounts:
+            - name: static-media
+              mountPath: /app/static
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+
+      volumes:
+        - name: static-media
+          persistentVolumeClaim:
+            claimName: ecommerce-static-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-service
+  namespace: "2401013"
+spec:
+  selector:
+    app: ecommerce
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecommerce-ingress
+  namespace: "2401013"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ecommerce.imcc.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ecommerce-service
+                port:
+                  number: 8000
+
