@@ -2360,178 +2360,313 @@
 
 
 
+// pipeline {
+//     agent {
+//         kubernetes {
+//             yaml '''
+// apiVersion: v1
+// kind: Pod
+// metadata:
+//   labels:
+//     jenkins/label: "2401013-ecommerce-agent"
+// spec:
+//   restartPolicy: Never
+//   nodeSelector:
+//     kubernetes.io/os: "linux"
+//   volumes:
+//     - name: workspace-volume
+//       emptyDir: {}
+//     - name: kubeconfig-secret
+//       secret:
+//         secretName: kubeconfig-secret
+//   containers:
+//     - name: python
+//       image: python:3.10
+//       command: ["cat"]
+//       tty: true
+//       volumeMounts:
+//         - name: workspace-volume
+//           mountPath: /home/jenkins/agent
+
+//     - name: sonar-scanner
+//       image: sonarsource/sonar-scanner-cli
+//       command: ["cat"]
+//       tty: true
+//       volumeMounts:
+//         - name: workspace-volume
+//           mountPath: /home/jenkins/agent
+
+//     - name: kubectl
+//       image: bitnami/kubectl:latest
+//       command: ["cat"]
+//       tty: true
+//       env:
+//         - name: KUBECONFIG
+//           value: /kube/config
+//       securityContext:
+//         runAsUser: 0
+//       volumeMounts:
+//         - name: kubeconfig-secret
+//           mountPath: /kube/config
+//           subPath: kubeconfig
+//         - name: workspace-volume
+//           mountPath: /home/jenkins/agent
+
+//     - name: dind
+//       image: docker:dind
+//       args: ["--storage-driver=overlay2", "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"]
+//       securityContext:
+//         privileged: true
+//       volumeMounts:
+//         - name: workspace-volume
+//           mountPath: /home/jenkins/agent
+
+//     - name: jnlp
+//       image: jenkins/inbound-agent:3345.v03dee9b_f88fc-1
+//       env:
+//         - name: JENKINS_AGENT_NAME
+//           value: "2401013-ecommerce-agent"
+//         - name: JENKINS_AGENT_WORKDIR
+//           value: "/home/jenkins/agent"
+//       volumeMounts:
+//         - name: workspace-volume
+//           mountPath: /home/jenkins/agent
+// '''
+//         }
+//     }
+
+//     environment {
+
+//         // Student Namespace
+//         NAMESPACE = '2401013'
+
+//         // Nexus Registry
+//         REGISTRY  = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
+//         APP_NAME  = 'ecommerce'
+//         IMAGE_TAG = 'latest'
+//         IMAGE     = "${REGISTRY}/${NAMESPACE}/${APP_NAME}"
+
+//         NEXUS_USER = 'student'
+//         NEXUS_PASS = 'Changeme@2025'
+
+//         // SonarQube
+//         SONAR_PROJECT_KEY = '2401013_ecommerce'
+//         SONAR_HOST_URL    = 'http://sonarqube.imcc.com'
+//         SONAR_TOKEN       = credentials('sonar-token-2002')
+//     }
+
+//     stages {
+
+//         stage('Install Python Dependencies') {
+//             steps {
+//                 container('python') {
+//                     sh '''
+//                     pip install --upgrade pip
+//                     pip install -r requirements.txt
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Run SonarQube Analysis') {
+//             steps {
+//                 container('sonar-scanner') {
+//                     sh """
+//                     sonar-scanner \
+//                       -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+//                       -Dsonar.sources=. \
+//                       -Dsonar.host.url=${SONAR_HOST_URL} \
+//                       -Dsonar.login=${SONAR_TOKEN}
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 container('dind') {
+//                     sh '''
+//                     while ! docker info > /dev/null 2>&1; do sleep 3; done
+
+//                     docker build -t ${IMAGE}:${IMAGE_TAG} .
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Login to Nexus Registry') {
+//             steps {
+//                 container('dind') {
+//                     sh """
+//                     echo "${NEXUS_PASS}" | docker login ${REGISTRY} -u "${NEXUS_USER}" --password-stdin
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Push Image to Nexus') {
+//             steps {
+//                 container('dind') {
+//                     sh '''
+//                     docker push ${IMAGE}:${IMAGE_TAG}
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Deploy to Kubernetes') {
+//             steps {
+//                 container('kubectl') {
+//                     sh """
+//                     kubectl apply -f deployment.yaml -n ${NAMESPACE}
+//                     kubectl apply -f service.yaml -n ${NAMESPACE}
+
+//                     kubectl set image deployment/ecommerce-deployment ecommerce=${IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
+
+//                     kubectl rollout status deployment/ecommerce-deployment -n ${NAMESPACE}
+//                     """
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         success { echo "✅ Pipeline completed successfully!" }
+//         failure { echo "❌ Pipeline failed. Check logs!" }
+//     }
+// }
+
+
+
+
+
+
+
 pipeline {
     agent {
         kubernetes {
             yaml '''
 apiVersion: v1
 kind: Pod
-metadata:
-  labels:
-    jenkins/label: "2401013-ecommerce-agent"
 spec:
-  restartPolicy: Never
-  nodeSelector:
-    kubernetes.io/os: "linux"
-  volumes:
-    - name: workspace-volume
-      emptyDir: {}
-    - name: kubeconfig-secret
-      secret:
-        secretName: kubeconfig-secret
   containers:
-    - name: python
-      image: python:3.10
-      command: ["cat"]
-      tty: true
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
+  - name: sonar-scanner
+    image: sonarsource/sonar-scanner-cli
+    command: [ "cat" ]
+    tty: true
 
-    - name: sonar-scanner
-      image: sonarsource/sonar-scanner-cli
-      command: ["cat"]
-      tty: true
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: [ "cat" ]
+    tty: true
+    securityContext:
+      runAsUser: 0
+      readOnlyRootFilesystem: false
+    env:
+    - name: KUBECONFIG
+      value: /kube/config        
+    volumeMounts:
+    - name: kubeconfig-secret
+      mountPath: /kube/config
+      subPath: kubeconfig
 
-    - name: kubectl
-      image: bitnami/kubectl:latest
-      command: ["cat"]
-      tty: true
-      env:
-        - name: KUBECONFIG
-          value: /kube/config
-      securityContext:
-        runAsUser: 0
-      volumeMounts:
-        - name: kubeconfig-secret
-          mountPath: /kube/config
-          subPath: kubeconfig
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
+  - name: dind
+    image: docker:dind
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    volumeMounts:
+    - name: docker-config
+      mountPath: /etc/docker/daemon.json
+      subPath: daemon.json
 
-    - name: dind
-      image: docker:dind
-      args: ["--storage-driver=overlay2", "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"]
-      securityContext:
-        privileged: true
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
-
-    - name: jnlp
-      image: jenkins/inbound-agent:3345.v03dee9b_f88fc-1
-      env:
-        - name: JENKINS_AGENT_NAME
-          value: "2401013-ecommerce-agent"
-        - name: JENKINS_AGENT_WORKDIR
-          value: "/home/jenkins/agent"
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /home/jenkins/agent
+  volumes:
+  - name: docker-config
+    configMap:
+      name: docker-daemon-config
+  - name: kubeconfig-secret
+    secret:
+      secretName: kubeconfig-secret
 '''
         }
     }
 
-    environment {
-
-        // Student Namespace
-        NAMESPACE = '2401013'
-
-        // Nexus Registry
-        REGISTRY  = 'nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085'
-        APP_NAME  = 'ecommerce'
-        IMAGE_TAG = 'latest'
-        IMAGE     = "${REGISTRY}/${NAMESPACE}/${APP_NAME}"
-
-        NEXUS_USER = 'student'
-        NEXUS_PASS = 'Changeme@2025'
-
-        // SonarQube
-        SONAR_PROJECT_KEY = '2401013_ecommerce'
-        SONAR_HOST_URL    = 'http://sonarqube.imcc.com'
-        SONAR_TOKEN       = credentials('sonar-token-2002')
-    }
-
     stages {
-
-        stage('Install Python Dependencies') {
-            steps {
-                container('python') {
-                    sh '''
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    '''
-                }
-            }
-        }
-
-        stage('Run SonarQube Analysis') {
-            steps {
-                container('sonar-scanner') {
-                    sh """
-                    sonar-scanner \
-                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                      -Dsonar.sources=. \
-                      -Dsonar.host.url=${SONAR_HOST_URL} \
-                      -Dsonar.login=${SONAR_TOKEN}
-                    """
-                }
-            }
-        }
 
         stage('Build Docker Image') {
             steps {
                 container('dind') {
                     sh '''
-                    while ! docker info > /dev/null 2>&1; do sleep 3; done
-
-                    docker build -t ${IMAGE}:${IMAGE_TAG} .
+                        sleep 15
+                        docker build -t ecommerce:latest .
+                        docker image ls
                     '''
                 }
             }
         }
 
-        stage('Login to Nexus Registry') {
-            steps {
-                container('dind') {
-                    sh """
-                    echo "${NEXUS_PASS}" | docker login ${REGISTRY} -u "${NEXUS_USER}" --password-stdin
-                    """
-                }
-            }
-        }
-
-        stage('Push Image to Nexus') {
+        stage('Run Django Tests') {
             steps {
                 container('dind') {
                     sh '''
-                    docker push ${IMAGE}:${IMAGE_TAG}
+                        docker run --rm ecommerce:latest \
+                        pytest --maxfail=1 --disable-warnings --cov=. --cov-report=xml || true
                     '''
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('SonarQube Analysis') {
             steps {
-                container('kubectl') {
-                    sh """
-                    kubectl apply -f deployment.yaml -n ${NAMESPACE}
-                    kubectl apply -f service.yaml -n ${NAMESPACE}
-
-                    kubectl set image deployment/ecommerce-deployment ecommerce=${IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
-
-                    kubectl rollout status deployment/ecommerce-deployment -n ${NAMESPACE}
-                    """
+                container('sonar-scanner') {
+                    withCredentials([string(credentialsId: 'sonar-token-2401013', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=2401013_ecommerce \
+                        -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                        -Dsonar.login=$SONAR_TOKEN \
+                        -Dsonar.python.coverage.reportPaths=coverage.xml
+                        '''
+                    }
                 }
             }
         }
-    }
 
-    post {
-        success { echo "✅ Pipeline completed successfully!" }
-        failure { echo "❌ Pipeline failed. Check logs!" }
+        stage('Login To Docker Registry') {
+            steps {
+                container('dind') {
+                    sh '''
+                    docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                    -u admin -p Changeme@2025
+                    '''
+                }
+            }
+        }
+
+        stage('Build, Tag & Push Image') {
+            steps {
+                container('dind') {
+                    sh '''
+                    docker tag ecommerce:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401013-project/ecommerce:latest
+                    docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401013-project/ecommerce:latest
+                    docker image ls
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy To Kubernetes') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                    kubectl apply -f K8s/deployment.yaml
+                    kubectl apply -f K8s/service.yaml
+                    kubectl rollout status deployment/ecommerce-deployment -n 2401013
+                    '''
+                }
+            }
+        }
     }
 }
