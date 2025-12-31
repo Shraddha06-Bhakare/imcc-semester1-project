@@ -2733,9 +2733,9 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        sleep 15
-                        docker build -t ecommerce:latest .
-                        docker image ls
+                    sleep 15
+                    docker build -t ecommerce:latest .
+                    docker image ls
                     '''
                 }
             }
@@ -2745,31 +2745,30 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        docker run --rm ecommerce:latest \
-                        pytest --maxfail=1 --disable-warnings --cov=. --cov-report=xml || true
+                    docker run --rm ecommerce:latest \
+                    pytest --maxfail=1 --disable-warnings || true
                     '''
                 }
             }
         }
 
         stage('SonarQube Analysis') {
-    steps {
-        container('sonar-scanner') {
-            withCredentials([string(credentialsId: 'sonar-token-2401013', variable: 'SONAR_TOKEN')]) {
-                sh '''
-                sonar-scanner \
-                -Dsonar.projectKey=2401013_ecommerce \
-                -Dsonar.projectName=2401013_ecommerce \
-                -Dsonar.sources=. \
-                -Dsonar.language=py \
-                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                -Dsonar.login=$SONAR_TOKEN
-                '''
+            steps {
+                container('sonar-scanner') {
+                    withCredentials([string(credentialsId: 'sonar-token-2401013', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=2401013_ecommerce \
+                        -Dsonar.projectName=2401013_ecommerce \
+                        -Dsonar.sources=. \
+                        -Dsonar.language=py \
+                        -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                        -Dsonar.login=$SONAR_TOKEN
+                        '''
+                    }
+                }
             }
         }
-    }
-}
-
 
         stage('Login To Docker Registry') {
             steps {
@@ -2799,7 +2798,6 @@ spec:
                 container('kubectl') {
                     sh '''
                     kubectl apply -f K8s/deployment.yaml
-                    kubectl apply -f K8s/service.yaml
                     kubectl rollout status deployment/ecommerce-deployment -n 2401013
                     '''
                 }
