@@ -65,30 +65,94 @@
 
 
 
-# Use official Python image
-FROM python:3.10-slim
+# # Use official Python image
+# FROM python:3.10-slim
 
+# # Set working directory
+# WORKDIR /app
+
+# # Install system dependencies
+# RUN apt-get update && apt-get install -y \
+#     build-essential \
+#     libpq-dev \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Copy project files
+# COPY . .
+
+# # Install Python dependencies
+# RUN pip install --upgrade pip
+# RUN pip install -r requirements.txt
+
+# # Collect static files
+# RUN python manage.py collectstatic --noinput
+
+# # Expose Django port
+# EXPOSE 8000
+
+# # Gunicorn command
+# CMD ["gunicorn", "firstapp.wsgi:application", "--bind", "0.0.0.0:8000"]
+
+
+
+
+
+
+# -------------------------------
+# Base Image
+# -------------------------------
+FROM python:3.10-slim-bullseye
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# -------------------------------
 # Set working directory
+# -------------------------------
 WORKDIR /app
 
+# -------------------------------
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+# -------------------------------
+RUN apt-get update && apt-get install -y --fix-missing \
     build-essential \
-    libpq-dev \
+    pkg-config \
+    default-libmysqlclient-dev \
+    libssl-dev \
+    curl \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# -------------------------------
+# Install Python dependencies
+# -------------------------------
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install gunicorn pytest pytest-cov
+
+# -------------------------------
 # Copy project files
+# -------------------------------
 COPY . .
 
-# Install Python dependencies
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# -------------------------------
+# Create non-root user
+# -------------------------------
+RUN adduser --disabled-password appuser
+USER appuser
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
-# Expose Django port
+# -------------------------------
+# Expose port
+# -------------------------------
 EXPOSE 8000
 
-# Gunicorn command
-CMD ["gunicorn", "firstapp.wsgi:application", "--bind", "0.0.0.0:8000"]
+# -------------------------------
+# Kubernetes Health Check
+# -------------------------------
+HEALTHCHECK CMD curl -f http://localhost:8000/ || exit 1
+
+# -------------------------------
+# Start server (safe for CI/CD)
+# -------------------------------
+CMD ["sh", "-c", "python manage.py migrate || true && exec gunicorn ecommerce.wsgi:application --bind 0.0.0.0:8000"]
