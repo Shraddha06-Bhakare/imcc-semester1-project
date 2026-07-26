@@ -1,6 +1,0 @@
-projectKey=2401013_ecommerce
-serverUrl=http://sonarqube.imcc.com
-serverVersion=25.1.0.102122
-dashboardUrl=http://sonarqube.imcc.com/dashboard?id=2401013_ecommerce
-ceTaskId=afb7d64f-cfd0-4b0e-b712-1e1fb7c4bcf0
-ceTaskUrl=http://sonarqube.imcc.com/api/ce/task?id=afb7d64f-cfd0-4b0e-b712-1e1fb7c4bcf0

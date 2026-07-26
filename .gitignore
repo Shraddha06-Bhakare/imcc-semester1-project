@@ -1,46 +1,80 @@
-cat > .gitignore <<'EOF'
-# Python / Django
+# cat > .gitignore <<'EOF'
+# # Python / Django
+# __pycache__/
+# *.py[cod]
+# *.egg-info/
+# *.egg
+# *.so
+# *.log
+
+# # Virtual environments
+# venv/
+# .env
+# .venv/
+# env/
+# ENV/
+
+# # Database
+# db.sqlite3
+# *.sqlite3
+
+# # Django static & media
+# /static/
+# /media/
+# staticfiles/
+
+# # IDE/editor
+# .vscode/
+# .idea/
+# *.suo
+# *.swp
+# .DS_Store
+
+# # Docker
+# docker-compose.override.yml
+
+# # Node
+# node_modules/
+
+# # Secrets
+# *.pem
+# *.key
+
+# # pipenv / poetry
+# Pipfile.lock
+# poetry.lock
+# EOF
+
+
+
+# Python
 __pycache__/
 *.py[cod]
-*.egg-info/
-*.egg
-*.so
-*.log
+*.pyo
 
-# Virtual environments
+# Virtual Environment
 venv/
-.env
-.venv/
 env/
-ENV/
 
-# Database
+# Django
 db.sqlite3
 *.sqlite3
 
-# Django static & media
-/static/
-/media/
+# Environment Variables
+.env
+
+# Static files
 staticfiles/
 
-# IDE/editor
+# Media files
+media/
+
+# VS Code
 .vscode/
-.idea/
-*.suo
-*.swp
+
+# OS files
 .DS_Store
+Thumbs.db
 
-# Docker
-docker-compose.override.yml
-
-# Node
-node_modules/
-
-# Secrets
-*.pem
-*.key
-
-# pipenv / poetry
-Pipfile.lock
-poetry.lock
-EOF
+# Python cache
+*.log
